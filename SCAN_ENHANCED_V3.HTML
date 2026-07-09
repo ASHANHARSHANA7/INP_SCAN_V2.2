@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>INP SCAN PRO V3</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0; -webkit-tap-highlight-color: transparent;}
+:root{
+  --primary:#2E75B6;--dark-blue:#1F3864;--light-blue:#D6E4F0;
+  --green:#00B050;--green-light:#C6EFCE;--green-dark:#375623;
+  --red:#C00000;--red-light:#FFC7CE;--red-dark:#9C0006;
+  --orange:#C55A11;--yellow:#FFC000;
+  --gray:#F2F2F2;--border:#D0D0D0;
+}
+body{font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size:14px;background:#f5f5f5;color:#1a1a1a;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* TOP BAR */
+.topbar{background:var(--dark-blue);color:#fff;padding:0 12px;display:flex;align-items:center;justify-content:space-between;height:60px;flex-shrink:0; box-shadow: 0 2px 4px rgba(0,0,0,0.2);}
+.topbar h1{font-size:16px;font-weight:700;display:flex;align-items:center;gap:6px}
+.kpi-bar{display:flex;gap:4px;}
+.kpi{text-align:center;padding:4px 8px;background:rgba(255,255,255,.1);border-radius:4px; min-width: 50px;}
+.kpi .v{font-size:16px;font-weight:700;line-height:1}
+.kpi .l{font-size:8px;opacity:.75;margin-top:2px; text-transform: uppercase;}
+
+/* TABS */
+.tabs{background:#fff;border-bottom:1px solid var(--border);display:flex;flex-shrink:0}
+.tab{flex:1; padding:12px 0;font-size:13px;font-weight:600;cursor:pointer;border-bottom:3px solid transparent;color:#666;display:flex;flex-direction:column;align-items:center;gap:2px; transition: 0.2s;}
+.tab.active{border-bottom-color:var(--primary);color:var(--primary); background: #f0f7ff;}
+.tab i { font-style: normal; font-size: 18px; }
+
+/* MAIN */
+.main{flex:1;overflow:hidden;display:flex;flex-direction:column; position: relative;}
+.pane{display:none;flex:1;overflow:hidden;flex-direction:column}
+.pane.active{display:flex}
+
+/* SCAN PANE */
+.scan-container{display:flex;flex:1;overflow:hidden; flex-direction: row;}
+.left-panel{width:400px; display: flex; flex-direction: column; background:#fff; border-right:1px solid var(--border); flex-shrink: 0;}
+.right-panel{flex:1; background:#f9f9f9; display: flex; flex-direction: column; overflow: hidden;}
+
+/* INPUT SECTION */
+.input-section { padding: 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.location-status { display: flex; align-items: center; justify-content: space-between; background: var(--light-blue); padding: 10px 15px; border-radius: 8px; margin-bottom: 12px; border: 1px solid var(--primary); }
+.location-info { display: flex; flex-direction: column; }
+.location-info .label { font-size: 10px; font-weight: 700; color: var(--primary); }
+.location-info .value { font-size: 18px; font-weight: 800; color: var(--dark-blue); }
+.location-count { background: var(--primary); color: white; padding: 4px 10px; border-radius: 20px; font-weight: 700; font-size: 14px; }
+
+.form-input{width:100%;padding:14px 12px;font-size:16px;border:2px solid var(--border);border-radius:8px;outline:none; transition: 0.2s; margin-bottom: 10px;}
+.form-input:focus{border-color:var(--primary); background: #fff;}
+.form-input.loc-mode { border-color: var(--orange); background: #fff9f0; }
+
+.btn-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+.btn{padding:12px;font-size:13px;font-weight:700;border-radius:8px;cursor:pointer;border:none;display:flex;align-items:center;justify-content:center;gap:6px; transition: opacity 0.1s;}
+.btn:active { opacity: 0.7; }
+.btn-primary{background:var(--primary);color:#fff}
+.btn-secondary{background:var(--dark-blue);color:#fff}
+.btn-danger{background:var(--red);color:#fff}
+.btn-success{background:var(--green);color:#fff}
+.btn-warning{background:var(--orange);color:#fff}
+
+/* CAMERA */
+.camera-wrapper{margin-bottom: 10px; border-radius:8px;overflow:hidden;background:#000;display:none;position:relative; height: 180px; flex-shrink: 0;}
+.camera-wrapper video{width:100%; height: 100%; object-fit:cover}
+
+/* LOCATION LIST (LEFT SIDE - RED BOX AREA) */
+.location-scans-header { padding: 8px 12px; background: var(--dark-blue); color: white; font-weight: 700; font-size: 11px; display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; letter-spacing: 0.5px; }
+.location-scans-list { flex: 1; overflow-y: auto; padding: 10px; background: #fff; }
+
+/* ACCORDION STYLES */
+.loc-item { border: 1px solid var(--border); border-radius: 6px; margin-bottom: 8px; overflow: hidden; }
+.loc-item-header { padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: #f8f9fa; border-bottom: 1px solid transparent; user-select: none; }
+.loc-item.open .loc-item-header { background: var(--light-blue); border-bottom-color: var(--border); }
+.loc-item-name { font-weight: 700; font-size: 14px; color: var(--dark-blue); }
+.loc-item-qty { font-weight: 700; color: var(--primary); font-size: 12px; }
+.loc-details { display: none; padding: 4px; background: #fff; max-height: 400px; overflow-y: auto; }
+.loc-item.open .loc-details { display: block; }
+
+/* VERTICAL STACKING FOR LABELS */
+.label-row { display: flex; flex-direction: column; gap: 4px; padding: 4px; }
+.label-pill { display: block; padding: 10px 15px; background: #f8fafc; border-radius: 6px; font-size: 14px; font-weight: 600; border: 1px solid #e2e8f0; color: #334155; position: relative; cursor: pointer; user-select: none; }
+.label-pill:active { background: #f1f5f9; }
+.label-pill.duplicate { background: var(--red-light); color: var(--red-dark); border-color: var(--red); }
+.label-pill .time-tag { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 10px; color: #94a3b8; font-weight: 400; }
+
+/* RIGHT PANEL PLACEHOLDER */
+.right-panel-info { padding: 40px; text-align: center; color: #999; }
+
+/* HISTORY TABLE */
+.history-controls { padding: 10px; background: #fff; border-bottom: 1px solid var(--border); display: flex; gap: 8px; }
+.search-input { flex: 1; padding: 10px; border-radius: 6px; border: 1px solid var(--border); font-size: 14px; }
+.table-scroll { flex: 1; overflow: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { background: var(--dark-blue); color: white; padding: 12px 8px; text-align: left; position: sticky; top: 0; z-index: 10; }
+td { padding: 10px 8px; border-bottom: 1px solid #eee; }
+.tr-duplicate { background: var(--red-light); }
+
+/* TOAST */
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:30px;font-size:14px;font-weight:700;color:#fff;z-index:9999;opacity:0;transition:0.3s; pointer-events: none; text-align: center; min-width: 200px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);}
+.toast.show{opacity:1; transform: translateX(-50%) translateY(-10px);}
+.toast-ok{background:var(--green)}
+.toast-err{background:var(--red)}
+.toast-warn{background:var(--orange)}
+
+/* EDIT MODAL */
+.modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center; }
+.modal-content { background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 400px; }
+.modal-title { font-weight: 700; margin-bottom: 15px; font-size: 18px; color: var(--dark-blue); }
+.modal-input { width: 100%; padding: 12px; border: 2px solid var(--primary); border-radius: 8px; font-size: 18px; margin-bottom: 15px; outline: none; }
+
+@media(max-width: 768px) {
+    .scan-container { flex-direction: column; }
+    .left-panel { width: 100%; height: 100%; }
+    .right-panel { display: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>📦 INP SCAN PRO V3</h1>
+  <div class="kpi-bar">
+    <div class="kpi"><div class="v" id="k-total">0</div><div class="l">Total</div></div>
+    <div class="kpi"><div class="v" id="k-dupes">0</div><div class="l">Dupes</div></div>
+    <div class="kpi"><div class="v" id="k-locs">0</div><div class="l">Locs</div></div>
+  </div>
+</div>
+
+<div class="main">
+  <!-- SCAN PANE -->
+  <div class="pane active" id="pane-scan">
+    <div class="scan-container">
+      <div class="left-panel">
+        <div class="input-section">
+          <div id="loc-display" class="location-status">
+            <div class="location-info">
+              <span class="label">CURRENT LOCATION</span>
+              <span class="value" id="current-loc">NOT SET</span>
+            </div>
+            <div class="location-count" id="current-loc-count">0</div>
+          </div>
+
+          <input type="text" class="form-input" id="barcode-inp" placeholder="Scan Location (R...) or Label ID" autocomplete="off">
+
+          <div class="btn-grid">
+            <button class="btn btn-secondary" onclick="toggleCamera()">📷 Cam</button>
+            <button class="btn btn-warning" onclick="resetLocation()">📍 Loc</button>
+            <button class="btn btn-danger" onclick="undoLast()">↩ Undo</button>
+          </div>
+          
+          <div style="display: flex; gap: 8px;">
+             <button class="btn btn-success" style="flex:1" onclick="exportXLSX()">📤 Export</button>
+             <button class="btn btn-danger" style="flex:1" onclick="confirmClear()">🗑 Clear</button>
+          </div>
+
+          <div class="camera-wrapper" id="cam-wrap">
+            <video id="cam-video" autoplay playsinline muted></video>
+          </div>
+        </div>
+
+        <div class="location-scans-header">
+          <span>SCAN HISTORY (DBL TAP TO EDIT)</span>
+          <span id="loc-summary">0 Locs</span>
+        </div>
+        <div class="location-scans-list" id="location-list">
+          <!-- Accordion locations will go here -->
+        </div>
+      </div>
+
+      <div class="right-panel">
+        <div class="right-panel-info">
+          <h2 style="color: var(--dark-blue); margin-bottom: 10px;">SCAN OVERVIEW</h2>
+          <p>Double-tap any Location or Label ID to edit.</p>
+          <p>Label IDs are now stacked vertically for better reading.</p>
+          <p>Export now includes Date and Time for each scan.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTORY PANE -->
+  <div class="pane" id="pane-history">
+    <div class="history-controls">
+      <input type="text" class="search-input" id="hist-search" placeholder="Search labels or locations...">
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Label ID</th>
+            <th>Location</th>
+            <th>Date/Time</th>
+          </tr>
+        </thead>
+        <tbody id="history-table"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- BOTTOM TABS -->
+<div class="tabs">
+  <div class="tab active" data-tab="scan"><i>📷</i>Scan</div>
+  <div class="tab" data-tab="history"><i>📜</i>History</div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal" id="edit-modal">
+  <div class="modal-content">
+    <div class="modal-title" id="modal-title">Edit Entry</div>
+    <input type="text" id="edit-input" class="modal-input">
+    <div style="display: flex; gap: 10px;">
+      <button class="btn btn-primary" style="flex:1" onclick="saveEdit()">Save</button>
+      <button class="btn btn-secondary" style="flex:1" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// Firebase Configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyAKF_gFklQ1hCC_xImc8OwX3QeeNO7OkB8",
+  authDomain: "inp-scan.firebaseapp.com",
+  projectId: "inp-scan",
+  storageBucket: "inp-scan.firebasestorage.app",
+  messagingSenderId: "163715597234",
+  appId: "1:163715597234:web:ce3d9c83fdfe63f4f01aab",
+  measurementId: "G-EJQM76XZPP"
+};
+
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const scansRef = db.ref('scans');
+
+// Application State
+const S = {
+  scans: [],
+  currentLoc: null,
+  camActive: false,
+  camStream: null,
+  camTimer: null,
+  editingId: null,
+  editingType: null, // 'label' or 'location'
+  oldLocationValue: null,
+  lastTap: 0,
+  openLocs: {} 
+};
+
+// Initialize
+window.onload = () => {
+  scansRef.on('value', (snapshot) => {
+    const data = snapshot.val();
+    S.scans = data ? Object.values(data) : [];
+    S.scans.sort((a, b) => b.timestamp - a.timestamp);
+    renderAll();
+  });
+  
+  document.getElementById('barcode-inp').focus();
+  
+  document.querySelectorAll('.tab').forEach(t => {
+    t.onclick = () => {
+      document.querySelectorAll('.tab, .pane').forEach(el => el.classList.remove('active'));
+      t.classList.add('active');
+      document.getElementById('pane-' + t.dataset.tab).classList.add('active');
+      if(t.dataset.tab === 'scan') document.getElementById('barcode-inp').focus();
+    };
+  });
+
+  document.getElementById('barcode-inp').onkeydown = (e) => {
+    if (e.key === 'Enter') processInput(e.target.value);
+  };
+};
+
+function processInput(val) {
+  val = val.trim();
+  if (!val) return;
+  document.getElementById('barcode-inp').value = '';
+
+  if (val.toLowerCase().startsWith('r')) {
+    const newLoc = val.toUpperCase();
+    S.openLocs = {}; 
+    S.openLocs[newLoc] = true;
+    S.currentLoc = newLoc;
+    showToast(`Location: ${S.currentLoc}`, 'ok');
+    renderAll();
+  } else {
+    if (!S.currentLoc) {
+      showToast('SET LOCATION FIRST!', 'err');
+      return;
+    }
+    S.openLocs[S.currentLoc] = true;
+    saveScan(val, S.currentLoc);
+  }
+}
+
+function saveScan(labelId, loc) {
+  const isDupe = S.scans.some(s => s.labelId === labelId);
+  const newScan = {
+    id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+    labelId: labelId,
+    location: loc,
+    timestamp: Date.now(),
+    timeStr: new Date().toLocaleString()
+  };
+
+  scansRef.child(newScan.id).set(newScan);
+  
+  if (isDupe) showToast(`DUPLICATE: ${labelId}`, 'warn');
+  else showToast(`Scanned: ${labelId}`, 'ok');
+}
+
+function undoLast() {
+  if (S.scans.length === 0) return;
+  const last = S.scans[0];
+  if (confirm(`Undo scan: ${last.labelId}?`)) {
+    scansRef.child(last.id).remove();
+    showToast('Undo successful', 'ok');
+  }
+}
+
+function resetLocation() {
+  S.currentLoc = null;
+  document.getElementById('barcode-inp').classList.add('loc-mode');
+  document.getElementById('barcode-inp').placeholder = "SCAN LOCATION (R...)";
+  showToast('Scan new location', 'warn');
+  renderAll();
+}
+
+function renderAll() {
+  renderKPIs();
+  renderLocationList();
+  renderHistory();
+  
+  const inp = document.getElementById('barcode-inp');
+  const locVal = document.getElementById('current-loc');
+  const locCount = document.getElementById('current-loc-count');
+  
+  if (S.currentLoc) {
+    locVal.textContent = S.currentLoc;
+    inp.classList.remove('loc-mode');
+    inp.placeholder = "SCAN LABEL ID";
+    const count = S.scans.filter(s => s.location === S.currentLoc).length;
+    locCount.textContent = count;
+  } else {
+    locVal.textContent = "NOT SET";
+    locCount.textContent = "0";
+    inp.classList.add('loc-mode');
+  }
+}
+
+function renderKPIs() {
+  const total = S.scans.length;
+  const labelCounts = {};
+  S.scans.forEach(s => labelCounts[s.labelId] = (labelCounts[s.labelId] || 0) + 1);
+  const dupes = Object.values(labelCounts).filter(v => v > 1).length;
+  const locs = new Set(S.scans.map(s => s.location)).size;
+  
+  document.getElementById('k-total').textContent = total;
+  document.getElementById('k-dupes').textContent = dupes;
+  document.getElementById('k-locs').textContent = locs;
+}
+
+function renderLocationList() {
+  const container = document.getElementById('location-list');
+  const groups = {};
+  
+  S.scans.forEach(s => {
+    if (!groups[s.location]) groups[s.location] = [];
+    groups[s.location].push(s);
+  });
+  
+  const sortedLocs = Object.keys(groups).sort((a, b) => {
+    if (a === S.currentLoc) return -1;
+    if (b === S.currentLoc) return 1;
+    const timeA = Math.max(...groups[a].map(s => s.timestamp));
+    const timeB = Math.max(...groups[b].map(s => s.timestamp));
+    return timeB - timeA;
+  });
+
+  document.getElementById('loc-summary').textContent = `${sortedLocs.length} Locs`;
+  
+  if (sortedLocs.length === 0) {
+    container.innerHTML = '<div style="text-align:center; padding:40px; color:#999">No scans yet</div>';
+    return;
+  }
+
+  const labelCounts = {};
+  S.scans.forEach(s => labelCounts[s.labelId] = (labelCounts[s.labelId] || 0) + 1);
+
+  container.innerHTML = sortedLocs.map(loc => {
+    const items = groups[loc];
+    const isOpen = S.openLocs[loc];
+    return `
+      <div class="loc-item ${isOpen ? 'open' : ''}">
+        <div class="loc-item-header" onclick="handleLocHeaderClick(event, '${loc}')">
+          <span class="loc-item-name">${loc}</span>
+          <span class="loc-item-qty">${items.length} items</span>
+        </div>
+        <div class="loc-details">
+          <div class="label-row">
+            ${items.map(s => `
+              <div class="label-pill ${labelCounts[s.labelId] > 1 ? 'duplicate' : ''}" 
+                    onclick="handleLabelTap(event, '${s.id}', '${s.labelId}')">
+                ${s.labelId}
+                <span class="time-tag">${s.timeStr.split(',')[1] || ''}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function handleLocHeaderClick(e, loc) {
+  const now = Date.now();
+  if (now - S.lastTap < 300) {
+    openEdit('location', loc, loc);
+  } else {
+    toggleLoc(loc);
+  }
+  S.lastTap = now;
+}
+
+function toggleLoc(loc) {
+  if (S.openLocs[loc]) delete S.openLocs[loc];
+  else S.openLocs[loc] = true;
+  renderLocationList();
+}
+
+function handleLabelTap(e, id, currentVal) {
+  const now = Date.now();
+  if (now - S.lastTap < 300) {
+    openEdit('label', id, currentVal);
+  }
+  S.lastTap = now;
+}
+
+function openEdit(type, id, val) {
+  S.editingType = type;
+  S.editingId = id;
+  if (type === 'location') S.oldLocationValue = val;
+  
+  document.getElementById('modal-title').textContent = type === 'label' ? 'Edit Label ID' : 'Edit Location Name';
+  document.getElementById('edit-input').value = val;
+  document.getElementById('edit-modal').style.display = 'flex';
+  setTimeout(() => document.getElementById('edit-input').focus(), 100);
+}
+
+function saveEdit() {
+  const newVal = document.getElementById('edit-input').value.trim();
+  if (!newVal) return;
+
+  if (S.editingType === 'label') {
+    scansRef.child(S.editingId).update({ labelId: newVal });
+    showToast('Label updated', 'ok');
+  } else if (S.editingType === 'location') {
+    // Update all scans with this location
+    const updates = {};
+    S.scans.forEach(s => {
+      if (s.location === S.oldLocationValue) {
+        updates[`${s.id}/location`] = newVal.toUpperCase();
+      }
+    });
+    db.ref('scans').update(updates);
+    
+    // Update state
+    if (S.currentLoc === S.oldLocationValue) S.currentLoc = newVal.toUpperCase();
+    if (S.openLocs[S.oldLocationValue]) {
+        delete S.openLocs[S.oldLocationValue];
+        S.openLocs[newVal.toUpperCase()] = true;
+    }
+    showToast('Location updated', 'ok');
+  }
+  closeModal();
+}
+
+function closeModal() {
+  document.getElementById('edit-modal').style.display = 'none';
+}
+
+function renderHistory() {
+  const tbody = document.getElementById('history-table');
+  const q = document.getElementById('hist-search').value.toLowerCase();
+  
+  const filtered = S.scans.filter(s => 
+    s.labelId.toLowerCase().includes(q) || 
+    s.location.toLowerCase().includes(q)
+  );
+  
+  const labelCounts = {};
+  S.scans.forEach(s => labelCounts[s.labelId] = (labelCounts[s.labelId] || 0) + 1);
+
+  tbody.innerHTML = filtered.map(s => `
+    <tr class="${labelCounts[s.labelId] > 1 ? 'tr-duplicate' : ''}">
+      <td><b>${s.labelId}</b></td>
+      <td>${s.location}</td>
+      <td style="font-size:10px; color:#666">${s.timeStr}</td>
+    </tr>
+  `).join('');
+}
+
+document.getElementById('hist-search').oninput = renderHistory;
+
+function confirmClear() {
+  if (confirm("Are you sure you want to clear ALL scan data? This cannot be undone.")) {
+    scansRef.remove();
+    showToast('All data cleared', 'err');
+  }
+}
+
+function exportXLSX() {
+  if (S.scans.length === 0) { showToast('No data to export', 'warn'); return; }
+  
+  // Prepare data with Date and Time
+  const data = S.scans.map(s => {
+    const dt = new Date(s.timestamp);
+    return {
+      'Label ID': s.labelId,
+      'Location': s.location,
+      'Date': dt.toLocaleDateString(),
+      'Time': dt.toLocaleTimeString(),
+      'Full Timestamp': s.timeStr
+    };
+  });
+  
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Scans");
+  XLSX.writeFile(wb, `INP_SCAN_EXPORT_${new Date().getTime()}.xlsx`);
+  showToast('Exported with Date/Time', 'ok');
+}
+
+// Camera Logic
+function toggleCamera() {
+  if (S.camActive) stopCamera();
+  else startCamera();
+}
+
+async function startCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+    const video = document.getElementById('cam-video');
+    video.srcObject = stream;
+    S.camStream = stream;
+    S.camActive = true;
+    document.getElementById('cam-wrap').style.display = 'block';
+    
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    S.camTimer = setInterval(() => {
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0);
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imgData.data, canvas.width, canvas.height);
+        if (code) {
+          processInput(code.data);
+          stopCamera();
+        }
+      }
+    }, 250);
+  } catch (err) {
+    showToast("Camera error", "err");
+  }
+}
+
+function stopCamera() {
+  if (S.camStream) {
+    S.camStream.getTracks().forEach(t => t.stop());
+    S.camStream = null;
+  }
+  clearInterval(S.camTimer);
+  S.camActive = false;
+  document.getElementById('cam-wrap').style.display = 'none';
+}
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast show toast-${type}`;
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>
